@@ -3,8 +3,18 @@ Carloop firmware that emulates Drift Stick hardware or acts as a SLcan interface
 
 ABS software part is also needed to make the RS actually drift.
 
+## Install
+Carloop Basic (based on Particle Photon):
+```
+$ bash <( curl -sL https://particle.io/install-cli )
+$ particle update
+$ particle dfu
+$ particle flash --usb ./SoftStick.bin
+```
+
+Alternatively compile the source code and flash a Carloop device using Prticle Web IDE or Particle Workbench (https://www.particle.io/workbench).
+
 ## Usage
-Compile the code and flash a Carloop device using Prticle Web IDE or Particle Workbench (https://www.particle.io/workbench).
 
 The firmware will automatically change the mode of operation if serial connection is opened/closed. It is also possible to force the change by quickly pressing setup button 3 times.
 
