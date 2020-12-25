@@ -15,6 +15,8 @@
 
 #include <carloop.h>
 
+#define __VER__           "v100"
+
 #define OPMODE_SOFTSTICK  0
 #define OPMODE_SLCAN      1
 #define OPMODE_DEFAULT    OPMODE_SOFTSTICK
@@ -29,7 +31,7 @@ const char NEW_LINE = '\r';
 char inputBuffer[40];
 unsigned inputPos = 0;
 
-int drift, driftmode, drift_prep, lapai;
+int drift, driftmode, drift_init, dd, lapai;
 CANMessage lapamsg;
 CANMessage dmsg;
 Carloop<CarloopRevision2> carloop;
@@ -47,7 +49,7 @@ void set_opmode(int m) {
   if(opmode == OPMODE_SOFTSTICK) {
     fadeGray.setActive();
 
-    carloop.setCANSpeed(500000);
+    carloop.can().begin(500000);
     carloop.can().addFilter(0x0c8, 0xFFF);
     carloop.can().addFilter(0x1c0, 0xFFF);
 
@@ -71,13 +73,13 @@ void parse_0c8(uint8_t data[]) {
   int hb = data[3] & 0xf0;
 
   if(hb == 0xf0) {
-    if(drift == 0) {
+      if(!drift) {
+        dd = 0; 
+        drift_init = 1;
+      }
       drift = 1;
-    }
   } else {
-    if(drift == 1) {
-        drift = 0;
-    }
+      drift = 0;
   }
 }
 
@@ -126,8 +128,9 @@ void lapaSim() {
 void setupVars() {
   drift = 0;
   driftmode = 0;
-  drift_prep = 0;
+  drift_init = 0;
   lapai = 0;
+  dd = 0;
 
   lapamsg.id = 0x1c5;
   lapamsg.len = 8;
@@ -150,7 +153,7 @@ void setup() {
   Serial.begin(9600);
   
   delay(3500);
-  Serial.printf("Daftracing SoftStick (multimode) build %s\n\n", __TIMESTAMP__);
+  Serial.printf("Daftracing SoftStick (multimode) %s build %s\n\n", __VER__, __TIMESTAMP__);
 
   battVoltage = carloop.readBattery();
   if(battVoltage < 12.5 && battVoltage > 7) {
@@ -168,7 +171,7 @@ void loop() {
 }
 
 void loop_softstick() {
-  static unsigned long last = 0, lastbatt = 0, dd = 0, strikes = 0;
+  static unsigned long last = 0, lastbatt = 0, strikes = 0;
   unsigned long m;
   float battVoltage;
   
@@ -188,9 +191,10 @@ void loop_softstick() {
       lastbatt = m;
   }
 
-  if(driftmode and dd % 10 == 0) {
+  if(driftmode && drift && (dd % 10 == 0 || drift_init == 1)) {
     carloop.can().transmit(dmsg);
-    delay(10);
+    drift_init = 0;
+    delay(50);
   }
   dd++;
 
@@ -251,7 +255,7 @@ void parseInput(char c)
         transmitMessage(&inputBuffer[1], inputPos - 2);
         break;
       case 'v':
-        Serial.printf("Daftracing SoftStick (multimode) build %s\n", __TIMESTAMP__);
+        Serial.printf("Daftracing SoftStick (multimode) %s build %s\n", __VER__, __TIMESTAMP__);
         break;
     }
 
@@ -296,7 +300,7 @@ void changeCANSpeed(const char *buf, unsigned n)
     default: return;
   }
 
-  carloop.setCANSpeed(speed);
+  carloop.can().begin(speed);
 }
 
 unsigned hex2int(char c)
@@ -319,8 +323,6 @@ unsigned hex2int(char c)
 
 void transmitMessage(const char *buf, unsigned n)
 {
-  lapaSim();
-
   if (!opened())
   {
     return;
